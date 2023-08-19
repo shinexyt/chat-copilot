@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Deploy CopilotChat Azure resources
+Deploy Chat Copilot Azure resources
 #>
 
 param(
@@ -13,6 +13,16 @@ param(
     [string]
     # Subscription to which to make the deployment
     $Subscription,
+
+    [Parameter(Mandatory)]
+    [string]
+    # Azure AD client ID for the Web API backend app registration
+    $BackendClientId,
+
+    [Parameter(Mandatory)]
+    [string]
+    # Azure AD tenant ID for authenticating users
+    $TenantId,
 
     [Parameter(Mandatory)]
     [ValidateSet("AzureOpenAI", "OpenAI")]
@@ -44,10 +54,18 @@ param(
     # SKU for the Azure App Service plan
     $WebAppServiceSku = "B1",
 
-    [ValidateSet("Volatile", "AzureCognitiveSearch", "Qdrant")]
+    [string]
+    # Azure AD cloud instance for authenticating users
+    $AzureAdInstance = "https://login.microsoftonline.com",
+
+    [ValidateSet("Volatile", "AzureCognitiveSearch", "Qdrant", "Postgres")]
     [string]
     # What method to use to persist embeddings
     $MemoryStore = "AzureCognitiveSearch",
+
+    [SecureString]
+    # Password for the Postgres database
+    $SqlAdminPassword,
 
     [switch]
     # Don't deploy Cosmos DB for chat storage - Use volatile memory instead
@@ -87,6 +105,11 @@ if ($AIService -eq "OpenAI" -and !$AIApiKey) {
     exit 1
 }
 
+if ($MemoryStore -eq "Postgres" -and !$SqlAdminPassword) {
+    Write-Host "When MemoryStore is Postgres, SqlAdminPassword must be set"
+    exit 1
+}
+
 $jsonConfig = "
 {
     `\`"webAppServiceSku`\`": { `\`"value`\`": `\`"$WebAppServiceSku`\`" },
@@ -94,10 +117,14 @@ $jsonConfig = "
     `\`"aiService`\`": { `\`"value`\`": `\`"$AIService`\`" },
     `\`"aiApiKey`\`": { `\`"value`\`": `\`"$AIApiKey`\`" },
     `\`"aiEndpoint`\`": { `\`"value`\`": `\`"$AIEndpoint`\`" },
+    `\`"azureAdInstance`\`": { `\`"value`\`": `\`"$AzureAdInstance`\`" },
+    `\`"azureAdTenantId`\`": { `\`"value`\`": `\`"$TenantId`\`" },
+    `\`"webApiClientId`\`": { `\`"value`\`": `\`"$BackendClientId`\`"},
     `\`"deployNewAzureOpenAI`\`": { `\`"value`\`": $(If ($DeployAzureOpenAI) {"true"} Else {"false"}) },
     `\`"memoryStore`\`": { `\`"value`\`": `\`"$MemoryStore`\`" },
     `\`"deployCosmosDB`\`": { `\`"value`\`": $(If (!($NoCosmosDb)) {"true"} Else {"false"}) },
-    `\`"deploySpeechServices`\`": { `\`"value`\`": $(If (!($NoSpeechServices)) {"true"} Else {"false"}) }
+    `\`"deploySpeechServices`\`": { `\`"value`\`": $(If (!($NoSpeechServices)) {"true"} Else {"false"}) },
+    `\`"sqlAdminPassword`\`": { `\`"value`\`": `\`"$(If ($SqlAdminPassword) {ConvertFrom-SecureString $SqlAdminPassword -AsPlainText} Else {$null})`\`" }
 }
 "
 

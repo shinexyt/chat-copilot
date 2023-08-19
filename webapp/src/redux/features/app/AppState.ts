@@ -1,5 +1,6 @@
 // Copyright (c) Microsoft. All rights reserved.
 
+import { AuthHelper, DefaultActiveUserInfo } from '../../../libs/auth/AuthHelper';
 import { AlertType } from '../../../libs/models/AlertType';
 import { ServiceOptions } from '../../../libs/models/ServiceOptions';
 import { TokenUsage } from '../../../libs/models/TokenUsage';
@@ -83,13 +84,14 @@ export const Features = {
     [FeatureKeys.MultiUserChat]: {
         enabled: false,
         label: 'Live Chat Session Sharing',
+        description: 'Enable multi-user chat sessions. Not available when authorization is disabled.',
+        inactive: !AuthHelper.IsAuthAAD,
     },
     [FeatureKeys.RLHF]: {
         enabled: false,
         label: 'Reinforcement Learning from Human Feedback',
         description: 'Enable users to vote on model-generated responses. For demonstration purposes only.',
         // TODO: [Issue #42] Send and store feedback in backend
-        inactive: true,
     },
     [FeatureKeys.DeleteChats]: {
         enabled: false,
@@ -124,15 +126,10 @@ export const Settings = [
 ];
 
 export const initialState: AppState = {
-    alerts: [
-        {
-            message:
-                'By using Chat Copilot, you agree to protect sensitive data, not store it in chat, and allow chat history collection for service improvements. This tool is for internal use only.',
-            type: AlertType.Info,
-        },
-    ],
+    alerts: [],
+    activeUserInfo: AuthHelper.IsAuthAAD ? undefined : DefaultActiveUserInfo,
     tokenUsage: {},
     features: Features,
     settings: Settings,
-    serviceOptions: { memoryStore: { types: [], selectedType: '' } },
+    serviceOptions: { memoryStore: { types: [], selectedType: '' }, version: '' },
 };
